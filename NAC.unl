@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<lab name="NAC" version="1" scripttimeout="300" lock="0">
+  <topology>
+    <nodes>
+      <node id="1" name="Server" type="qemu" template="linux" image="linux-ubuntu-24.03" console="vnc" cpu="2" cpulimit="0" ram="4096" ethernet="2" uuid="fcaefecd-381e-4242-908b-eceebf279109" firstmac="00:50:00:00:01:00" qemu_options="-machine type=pc,accel=kvm -vga std -usbdevice tablet -boot order=cd -cpu host" qemu_version="2.12.0" qemu_arch="x86_64" qemu_nic="virtio-net-pci" delay="0" icon="Server-2D-Linux-S.svg" config="0" left="108" top="987">
+        <interface id="0" name="e0" type="ethernet" network_id="10"/>
+        <interface id="1" name="e1" type="ethernet" network_id="11"/>
+      </node>
+      <node id="2" name="BSW" type="qemu" template="viosl2" image="viosl2-adventerprisek9-m.SSA.high_iron_20200929" console="telnet" cpu="1" cpulimit="0" ram="1024" ethernet="8" uuid="c955e29d-7af6-44bd-a99b-4977d82dd71b" qemu_options="-machine type=pc,accel=kvm -serial mon:stdio -nographic -no-user-config -nodefaults -rtc base=utc -cpu host" qemu_version="2.4.0" qemu_arch="x86_64" delay="0" icon="Switch-2D-L3-Generic-S.svg" config="0" left="372" top="987">
+        <interface id="0" name="Gi0/0" type="ethernet" network_id="10"/>
+        <interface id="1" name="Gi0/1" type="ethernet" network_id="11"/>
+        <interface id="5" name="Gi1/1" type="ethernet" network_id="3"/>
+        <interface id="6" name="Gi1/2" type="ethernet" network_id="4"/>
+        <interface id="7" name="Gi1/3" type="ethernet" network_id="5"/>
+      </node>
+      <node id="3" name="GW1" type="qemu" template="viosl2" image="viosl2-adventerprisek9-m.SSA.high_iron_20200929" console="telnet" cpu="1" cpulimit="0" ram="1024" ethernet="8" uuid="0b4d0cc0-c4cc-43ca-b54f-c7a2ebf1f469" qemu_options="-machine type=pc,accel=kvm -serial mon:stdio -nographic -no-user-config -nodefaults -rtc base=utc -cpu host" qemu_version="2.4.0" qemu_arch="x86_64" delay="0" icon="Switch-2D-L3-Generic-S.svg" config="0" left="375" top="804">
+        <interface id="0" name="Gi0/0" type="ethernet" network_id="1"/>
+        <interface id="5" name="Gi1/1" type="ethernet" network_id="3"/>
+      </node>
+      <node id="4" name="GW2" type="qemu" template="viosl2" image="viosl2-adventerprisek9-m.SSA.high_iron_20200929" console="telnet" cpu="1" cpulimit="0" ram="1024" ethernet="8" uuid="013e6b7a-23f5-4633-9453-e37678a82ae9" qemu_options="-machine type=pc,accel=kvm -serial mon:stdio -nographic -no-user-config -nodefaults -rtc base=utc -cpu host" qemu_version="2.4.0" qemu_arch="x86_64" delay="0" icon="Switch-2D-L3-Generic-S.svg" config="0" left="870" top="987">
+        <interface id="0" name="Gi0/0" type="ethernet" network_id="2"/>
+        <interface id="5" name="Gi1/1" type="ethernet" network_id="8"/>
+      </node>
+      <node id="5" name="ASW1" type="qemu" template="viosl2" image="viosl2-adventerprisek9-m.SSA.high_iron_20200929" console="telnet" cpu="1" cpulimit="0" ram="1024" ethernet="8" uuid="ae8f82e6-231c-477f-b298-2f76df7c7c07" qemu_options="-machine type=pc,accel=kvm -serial mon:stdio -nographic -no-user-config -nodefaults -rtc base=utc -cpu host" qemu_version="2.4.0" qemu_arch="x86_64" delay="0" icon="Switch-2D-L2-Generic-S.svg" config="0" left="258" top="1161">
+        <interface id="0" name="Gi0/0" type="ethernet" network_id="6"/>
+        <interface id="1" name="Gi0/1" type="ethernet" network_id="12"/>
+        <interface id="5" name="Gi1/1" type="ethernet" network_id="4"/>
+      </node>
+      <node id="6" name="RSW" type="qemu" template="viosl2" image="viosl2-adventerprisek9-m.SSA.high_iron_20200929" console="telnet" cpu="1" cpulimit="0" ram="1024" ethernet="8" uuid="f5723b15-eaf9-4197-9b30-86ef2ef2e5b7" qemu_options="-machine type=pc,accel=kvm -serial mon:stdio -nographic -no-user-config -nodefaults -rtc base=utc -cpu host" qemu_version="2.4.0" qemu_arch="x86_64" delay="0" icon="Switch-2D-L2-Generic-S.svg" config="0" left="624" top="987">
+        <interface id="5" name="Gi1/1" type="ethernet" network_id="5"/>
+        <interface id="6" name="Gi1/2" type="ethernet" network_id="8"/>
+        <interface id="7" name="Gi1/3" type="ethernet" network_id="9"/>
+      </node>
+      <node id="7" name="ASW2" type="qemu" template="viosl2" image="viosl2-adventerprisek9-m.SSA.high_iron_20200929" console="telnet" cpu="1" cpulimit="0" ram="1024" ethernet="8" uuid="fa38bc3b-7aaa-41b2-9f24-b4c7408253e9" qemu_options="-machine type=pc,accel=kvm -serial mon:stdio -nographic -no-user-config -nodefaults -rtc base=utc -cpu host" qemu_version="2.4.0" qemu_arch="x86_64" delay="0" icon="Switch-2D-L2-Generic-S.svg" config="0" left="867" top="1176">
+        <interface id="0" name="Gi0/0" type="ethernet" network_id="7"/>
+        <interface id="5" name="Gi1/1" type="ethernet" network_id="9"/>
+      </node>
+      <node id="8" name="Window" type="qemu" template="win" image="win-10" console="vnc" cpu="1" cpulimit="0" ram="4096" ethernet="1" uuid="36722ec0-9e5b-4d50-8664-0f204fb5015c" qemu_options="-machine type=pc,accel=kvm -cpu host,+pcid,+kvm_pv_unhalt,+kvm_pv_eoi,hv_spinlocks=0x1fff,hv_vapic,hv_time,hv_reset,hv_vpindex,hv_runtime,hv_relaxed,hv_synic,hv_stimer -vga std -usbdevice tablet -boot order=cd -drive file=/opt/qemu/share/qemu/virtio-win-drivers.img,index=1,if=floppy,readonly" qemu_version="4.1.0" qemu_arch="x86_64" delay="0" icon="PC-2D-Desktop-Windows-S.svg" config="0" left="180" top="1350">
+        <interface id="0" name="e0" type="ethernet" network_id="6"/>
+      </node>
+      <node id="9" name="Window" type="qemu" template="win" image="win-10" console="vnc" cpu="1" cpulimit="0" ram="4096" ethernet="1" uuid="ac1c91ca-381f-45e3-8422-29e094c6b244" qemu_options="-machine type=pc,accel=kvm -cpu host,+pcid,+kvm_pv_unhalt,+kvm_pv_eoi,hv_spinlocks=0x1fff,hv_vapic,hv_time,hv_reset,hv_vpindex,hv_runtime,hv_relaxed,hv_synic,hv_stimer -vga std -usbdevice tablet -boot order=cd -drive file=/opt/qemu/share/qemu/virtio-win-drivers.img,index=1,if=floppy,readonly" qemu_version="4.1.0" qemu_arch="x86_64" delay="0" icon="PC-2D-Desktop-Windows-S.svg" config="0" left="867" top="1377">
+        <interface id="0" name="e0" type="ethernet" network_id="7"/>
+      </node>
+      <node id="10" name="Linux" type="qemu" template="linux" image="linux-ubuntu-24.03" console="vnc" cpu="2" cpulimit="0" ram="4096" ethernet="1" uuid="406d96c9-9721-401b-90a9-e56a4e7a1a4e" firstmac="00:50:00:00:0a:00" qemu_options="-machine type=pc,accel=kvm -vga std -usbdevice tablet -boot order=cd -cpu host" qemu_version="2.12.0" qemu_arch="x86_64" qemu_nic="virtio-net-pci" delay="0" icon="Server-2D-Linux-S.svg" config="0" left="366" top="1335">
+        <interface id="0" name="e0" type="ethernet" network_id="12"/>
+      </node>
+    </nodes>
+    <networks>
+      <network id="1" type="pnet0" name="ISP_A" left="372" top="651" visibility="1" icon="Cloud-2D-Blue-S.svg"/>
+      <network id="2" type="pnet0" name="ISP_B" left="867" top="654" visibility="1" icon="Cloud-2D-Blue-S.svg"/>
+      <network id="3" type="bridge" name="Net-GW1iface_5" left="327" top="227" visibility="0" icon="lan.png"/>
+      <network id="4" type="bridge" name="Net-BSWiface_6" left="400" top="278" visibility="0" icon="lan.png"/>
+      <network id="5" type="bridge" name="Net-BSWiface_7" left="390" top="187" visibility="0" icon="lan.png"/>
+      <network id="6" type="bridge" name="Net-ASW1iface_0" left="370" top="286" visibility="0" icon="lan.png"/>
+      <network id="7" type="bridge" name="Net-ASW2iface_0" left="251" top="331" visibility="0" icon="lan.png"/>
+      <network id="8" type="bridge" name="Net-Switchiface_6" left="357" top="399" visibility="0" icon="lan.png"/>
+      <network id="9" type="bridge" name="Net-Switchiface_7" left="452" top="274" visibility="0" icon="lan.png"/>
+      <network id="10" type="bridge" name="Net-Serveriface_0" left="461" top="354" visibility="0" icon="lan.png"/>
+      <network id="11" type="bridge" name="Net-Serveriface_1" left="246" top="396" visibility="0" icon="lan.png"/>
+      <network id="12" type="bridge" name="Net-Linuxiface_0" left="544" top="193" visibility="0" icon="lan.png"/>
+    </networks>
+  </topology>
+</lab>
