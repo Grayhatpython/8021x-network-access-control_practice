@@ -19,17 +19,12 @@
 
 ### 전체 구성(연구소 ↔ 기숙사, ISP A/B 분리)
 
-<img width="1722" height="1042" alt="스크린샷 2026-01-12 185928" src="https://github.com/user-attachments/assets/c836109b-ab95-4473-86bc-e7e96a6fe378" />
+<img width="707" height="684" alt="스크린샷 2026-01-17 012348" src="https://github.com/user-attachments/assets/c4e15781-533f-40d0-b49b-f3a71de402da" />
 
 
-### VLAN Summary
+### VLAN & Subnet Design
 
-<img width="1447" height="1004" alt="스크린샷 2026-01-12 190143" src="https://github.com/user-attachments/assets/dfabd43e-6437-499b-b775-e7374a56cb76" />
-
-
-### EVE NG 구성
-
-<img width="621" height="598" alt="스크린샷 2026-01-12 185647" src="https://github.com/user-attachments/assets/be12ed94-0a05-4fd3-a9e1-57f03aa31515" />
+<img width="1815" height="948" alt="스크린샷 2026-01-17 014147" src="https://github.com/user-attachments/assets/80424540-596f-44cb-a44d-d1334d6aa358" />
 
 
 ---
@@ -39,9 +34,9 @@
 
 | VLAN | 목적 | 주요 시스템/대상 | 기본 게이트웨이 | 라우팅/격리 정책 |
 |------|------|------------------|------------------|------------------|
-| **100** | 보안/인증 인프라 운영 VLAN | 보안장비, **인증 서버(FreeRADIUS)**, **DHCP 서버** | (백본 스위치 BSW) | 접근통제 정책 적용: **관리자 외 접근 차단**, 서비스 포트 단위 허용 |
-| **110** | 네트워크 장비 관리 VLAN | 스위치/게이트웨이 관리 IP, 원격 유지보수 트래픽 | (백본 스위치 BSW) | 인증 서버와의 통신 허용(인증/운영 관리 목적) |
-| **500** | 기숙사 사용자 VLAN | 기숙사 사용자 단말(데스크탑 등) | **GW2** | 연구소 내부로 라우팅되지 않음. **ISP B 회선(별도 경로)**로 인터넷 통신 |
+| **100** | 보안/인증 인프라 운영 VLAN | 보안장비, **인증 서버(FreeRADIUS)**, **DHCP 서버** | 접근통제 정책 적용: **관리자 외 접근 차단**, 서비스 포트 단위 허용 |
+| **110** | 네트워크 장비 관리 VLAN | 스위치/게이트웨이 관리 IP, 원격 유지보수 트래픽 | 인증 서버와의 통신 허용(인증/운영 관리 목적) |
+| **500** | 기숙사 사용자 VLAN | 기숙사 사용자 단말(데스크탑 등) |
 
 ---
 
@@ -60,15 +55,16 @@
 
 - **DHCP Server (DHCP 서버)**  
   - VLAN별 IP 할당 요청 처리(각 VLAN Scope 운영)
-  - VLAN800(기숙사)의 경우 **기본 게이트웨이는 NAC_GW_2**로 할당
+  - VLAN800(기숙사)의 경우 **기본 게이트웨이는 DSW2**로 할당
 
-- **Backbone Switch (BSW)**  
-  - 연구소 내부 네트워크의 중심(집선/정책 적용)
-  - VLAN300/310의 정책 기반 접근통제 및 기본 게이트웨이 역할
-
-- **Gateway Switch (GW1,GW2)**  
-  - 기본 게이트웨이
-  - 트래픽을 각각 **ISP A or ISP B**로 아웃바운드
+- **Distribution Switch (DSW)**
+  - 내부 네트워크의 중심
+  - 기본 게이트웨이 역할
+  - Inter-VLAN Routing (SVI)
+  - 상위 계층(Core/Edge)과 연결
+    
+- **Edge Router **  
+  - ISP / Internet / 외부 네트워크와 직접 연결
 
 ---
 
@@ -91,6 +87,8 @@
 
 ## 5) 트래픽 흐름(데이터/인증/DHCP)
 
+<img width="1545" height="767" alt="스크린샷 2026-01-17 020029" src="https://github.com/user-attachments/assets/91ba3bf1-5519-4997-a8ea-3c3a9cab60d2" />
+
 ### 5.1 물리 연결 경로(Physical)
 - Backbone ↔ Bridge ↔ Access 스위치로 L2/L3 경로 구성
 - 인증 서버/ DHCP 서버는 Backbone 영역(VLAN300)에 위치
@@ -98,7 +96,7 @@
 ### 5.2 데이터 통신 경로(Data Plane)
 - 인증 완료 후:
   - 연구소 내부 VLAN(예: 100/110 등)은 Backbone을 기본 게이트웨이로 통신
-  - 기숙사 VLAN500은 GW2를 기본 게이트웨이로 ISP B로 통신
+  - 기숙사 VLAN500은 DSW2 기본 게이트웨이로 통신
 
 ### 5.3 802.1X 인증 패킷 전달 경로(Control Plane)
 구성 요소: **요청자(Supplicant) → 인증자(Authenticator) → 인증서버(FreeRADIUS)**
@@ -117,8 +115,8 @@
 ### 5.4 DHCP IP 할당 경로
 - DHCP 서버는 VLAN100에서 운영하며, 각 VLAN별 IP 할당 요청을 처리
 - VLAN500(기숙사) 단말은 DHCP를 통해 IP를 할당받으며:
-  - **기본 게이트웨이(Default Gateway)는 GW2 VLAN500 인터페이스 IP**
-- 그 외 VLAN(예: 100/110 등)은 기본 게이트웨이가 Backbone(BSW)로 설정됨
+  - **기본 게이트웨이(Default Gateway)는 DSW2 VLAN500 인터페이스 IP**
+- 그 외 VLAN(예: 100/110 등)은 기본 게이트웨이가 Distribution(DSW1)로 설정됨
 
 ---
 
@@ -136,11 +134,11 @@
 - [ v ] 장치 연결 / 백본 / 연구소 스위치 / 기숙사 스위치 / 연계 스위치
 - [ v ] 테스트용 단말기 (Window10) / DHCP & 인증 서버 Ubuntu(24.04.3 LTS) 설치 -> 코어는 1~2코어로 최대한 가볍게 세팅
 - [ v ] EVE-NG에서 L3 장비를 Cloud0에 연결하고, 해당 인터페이스가 VMware NAT(vmnet8)로부터 DHCP로 IP를 할당받아 외부 인터넷 통신이 정상적으로 이루어짐을 검증함. 향후 FreeRADIUS 설치 및 외부 인증 서버 연동 실습을 고려하여, 패키지 다운로드와 서비스 연계를 위한 인터넷 접근 가능 환경을 사전에 확보함.
-- [ ] 연구소·기숙사 게이트웨이 포함(= L2/L3/VLAN/라우팅 기본 뼈대) 
+- [ ]v  연구소·기숙사 게이트웨이 포함(= L2/L3/VLAN/라우팅 기본 뼈대) 
 2. 인증 인프라 구성 (FreeRadius)
 - [ v ] OS 설치 및 환경 설정
 - [ v ] FreeRADIUS 및 관련 소프트웨어 설치/기본 설정
-- [ ] 사설 인증서 설치 + 인증자/테스트 사용자 등록
+- [ v ] 사설 인증서 설치 + 인증자/테스트 사용자 등록
 - [ ] DHCP 설정(가상 인터페이스 포함) + 스위치 환경 설정
 - [ ] 단말 사설 인증서 설치 + 802.1X 활성화/어댑터 설정 → 동작 테스트/인증 테스트
 .....
