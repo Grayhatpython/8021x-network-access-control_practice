@@ -1,0 +1,305 @@
+# 🧪 802.1X 실습 기록 (FreeRADIUS + DHCP + VLAN 810 + Windows Client)
+
+> **목표**  
+> 단말(Windows)이 802.1X 인증 성공 시 **VLAN 810** 으로 들어가고,  
+> **DHCP** 로 IP를 받아 통신 가능하게 구성한다.  
+> (Lab: **EVE-NG / Ubuntu / FreeRADIUS / Cisco Switch**)
+
+---
+
+## 🗺️ 구성 요약
+
+### 서버(Ubuntu)
+- FreeRADIUS IP: `10.0.10.11`
+- DHCP 제공 VLAN: `810`
+- DHCP 서버 인터페이스: `ens4.810`
+
+### 네트워크
+| 구분 | 인터페이스 | IP | 용도 |
+|---|---|---|---|
+| 관리/Radius | `ens3` | `10.0.10.11/28` | RADIUS/관리망, 기본 라우트 |
+| L2 연결 | `ens4` | `192.168.0.11/24` | 스위치 연동(물리) |
+| VLAN 810 | `ens4.810` | `192.168.81.11/24` | DHCP 제공(가상) |
+
+> ✅ **중요:** 기본 라우트(default route)는 **하나만**(보통 ens3) 유지한다.  
+> ens3 + ens4 둘 다 default를 넣으면 netplan이 충돌로 막는다.
+
+---
+
+## 1) Netplan: VLAN 인터페이스(ens4.810) 구성
+
+### ✅ 핵심 포인트
+- `ens4.810` 같은 점(.) 인터페이스는 `ethernets:`가 아니라 **`vlans:` 아래**에 작성해야 한다.
+- default route는 **관리망(ens3)** 에만 둔다.
+
+### `/etc/netplan/01-network-manager-all.yaml`
+
+```yaml
+network:
+  version: 2
+  renderer: NetworkManager
+
+  ethernets:
+    ens3:
+      dhcp4: no
+      addresses:
+        - 10.0.10.11/28
+      routes:
+        - to: default
+          via: 10.0.10.1
+      nameservers:
+        addresses: [210.220.163.82, 219.250.36.130]
+
+    ens4:
+      dhcp4: no
+      addresses:
+        - 192.168.0.11/24
+      # ⚠️ ens4에 default route를 추가하면 ens3와 충돌 가능
+
+  vlans:
+    ens4.810:
+      id: 810
+      link: ens4
+      dhcp4: no
+      addresses:
+        - 192.168.81.11/24
+      nameservers:
+        addresses: [210.220.163.82]
+        search: [korea.fs.kr]
+```
+
+⚠️ -> 요부분에서 그런지 모르겠으나 통신이 안되는 문제가 있어서 수정중입니다; 
+
+---
+
+## 2) DHCP 서버 설치 확인 및 기본 파일 위치
+
+### ✅ 핵심 포인트
+- isc-dhcp-server는 기본적으로 아래 위치를 사용한다.
+- DHCP 설정 파일: /etc/dhcp/dhcpd.conf
+- DHCP 서비스 인터페이스 지정: /etc/default/isc-dhcp-server
+
+<img width="810" height="196" alt="스크린샷 2026-01-17 233025" src="https://github.com/user-attachments/assets/54ff1cdd-38b9-442f-beb7-3d19b1c408b5" />
+
+---
+
+## 3) DHCP 설정(dhcpd.conf) 작성
+
+### ✅ 핵심 포인트
+- /etc/dhcp/dhcpd.conf
+```bash
+authoritative;
+ddns-update-style none;
+deny bootp;
+one-lease-per-client true;
+ignore client-updates;
+
+default-lease-time 86400;
+max-lease-time 604800;
+
+option domain-name "korea.fs.kr";
+option domain-name-servers 210.220.163.82, 219.250.36.130;
+
+log-facility local7;
+
+subnet 192.168.81.0 netmask 255.255.255.0 {
+  option routers 192.168.81.1;
+  option subnet-mask 255.255.255.0;
+
+  range 192.168.81.11 192.168.81.250;
+
+  default-lease-time 1800;
+  max-lease-time 3600;
+}
+```
+
+<img width="827" height="601" alt="스크린샷 2026-01-17 234001" src="https://github.com/user-attachments/assets/e914316c-5526-4393-a9b6-edd9d5d688ee" />
+
+---
+
+## 4) DHCP가 “어느 인터페이스에서” 받을지 지정
+
+### ✅ 핵심 포인트
+- /etc/default/isc-dhcp-server
+```bash
+INTERFACESv4="ens4.810"
+INTERFACESv6=""
+```
+
+<img width="823" height="595" alt="스크린샷 2026-01-17 234305" src="https://github.com/user-attachments/assets/db038d40-9147-4d70-a646-7b87b4ac752c" />
+
+---
+
+## 5) DHCP 설정 검증 & 서비스 재시작
+
+### ✅ 핵심 포인트
+- 설정 문법 검사
+```bash
+sudo dhcpd -t -cf /etc/dhcp/dhcpd.conf
+```
+
+- 재시작 / 상태 확인
+```bash
+sudo systemctl restart isc-dhcp-server
+sudo systemctl status isc-dhcp-server
+```
+
+<img width="958" height="505" alt="스크린샷 2026-01-18 003127" src="https://github.com/user-attachments/assets/31ff1c35-552c-4562-9f88-7b837b6d0630" />
+
+---
+
+## 6) 스위치 AAA + 802.1X “글로벌” 설정
+
+### ✅ Global (RADIUS-SRV / IP=10.0.10.11)
+```bash
+conf t
+aaa new-model
+
+radius server RADIUS-SRV
+ address ipv4 10.0.10.11 auth-port 1812 acct-port 1813
+ key test123
+
+aaa authentication dot1x default group radius
+aaa authorization network default group radius
+aaa accounting dot1x default start-stop group radius
+
+dot1x system-auth-control
+
+radius-server vsa send authentication
+radius-server vsa send accounting
+
+authentication mac-move permit
+end
+wr
+```
+
+- aaa new-model : AAA 기능 활성화(802.1X/Radius 연동의 시작)
+- radius server ... : RADIUS 서버(IP/포트/키) 등록
+- aaa authentication dot1x ... : 802.1X 인증을 RADIUS로 하겠다
+- aaa authorization network ... : 인증 성공 후 네트워크 권한(예: VLAN)을 RADIUS 정책 기준으로 적용
+- aaa accounting dot1x ... : 인증 시작/종료 기록을 RADIUS로 전송
+- dot1x system-auth-control : 스위치 전체에서 802.1X 동작 ON
+- radius-server vsa send ... : Vendor-Specific Attribute 전송(정책/정보 전달)
+- authentication mac-move permit : 같은 MAC이 다른 포트로 이동 시 허용(실습에서 자주 도움됨)
+
+---
+
+## 7) 스위치 “단말 연결 포트”에 802.1X 적용 (Access VLAN 810 / Guest VLAN 500)
+
+### ✅ 핵심 포인트
+- 802.1X는 ‘단말이 꽂힌 액세스 스위치 포트’에서 수행된다.
+- FreeRADIUS 서버가 연결된 스위치 포트에 802.1X를 걸 필요는 없음(서버는 그냥 서버 트래픽만 통과하면 됨).
+
+### ✅ 포트 예시 (Gi0/1)
+```bash
+conf t
+interface gi0/1
+ description ## Dot1X Auth Port ##
+ switchport mode access
+
+ spanning-tree portfast
+ spanning-tree bpduguard enable
+
+ authentication port-control auto
+ dot1x pae authenticator
+
+ ! (선택) 인증 실패/서버 응답 없음 시 Guest VLAN으로 보내기
+ authentication event fail action authorize vlan 500
+ authentication event no-response action authorize vlan 500
+ authentication event server dead action authorize vlan 500
+ authentication event server alive action reinitialize
+end
+wr
+```
+
+### ✅ 참고
+- “802.1X 포트 설정에 VLAN을 왜 안 적는 경우가 있나?”
+- 802.1X 환경에서는 VLAN을 RADIUS가 동적으로 내려주는 구조가 흔함
+- (예: 인증 성공 시 VLAN 810, 실패 시 VLAN 500 등)
+- 그래서 어떤 문서는 포트에 VLAN을 고정하지 않고, RADIUS 정책으로 VLAN을 결정하기도 함
+- “기본은 810”로 하고 싶으면 switchport access vlan 810을 주면 됨.
+(동적 VLAN까지 같이 하고 싶으면 RADIUS에서 Tunnel 속성으로 VLAN 내려주는 방식으로 확장 가능)
+
+---
+
+## 8) Windows 클라이언트: CA 인증서 설치 + 802.1X(PEAP) 설정
+   
+### ✅ 핵심 포인트
+- CA 파일을 더블클릭 → 인증서 설치
+- 저장소는 로컬 컴퓨터 → 신뢰할 수 있는 루트 인증 기관으로 넣기
+
+📷 인증서 정보
+
+<img width="488" height="592" alt="스크린샷 2026-01-18 032936" src="https://github.com/user-attachments/assets/6266d97d-1052-468f-adee-f4cb38be54ca" />
+
+📷 저장소 선택(신뢰할 수 있는 루트 인증 기관)
+
+<img width="1023" height="827" alt="스크린샷 2026-01-18 033028" src="https://github.com/user-attachments/assets/75f7984e-7512-4a64-abc7-b922cc6086a4" />
+
+📷 설치 경고(지문 SHA1 표시)
+
+<img width="1023" height="838" alt="스크린샷 2026-01-18 033053" src="https://github.com/user-attachments/assets/f9920662-3ef7-465e-be03-fb745ce7741b" />
+
+
+---
+
+## 9) Windows 클라이언트: CA 인증서 설치 + 802.1X(PEAP) 설정
+   
+### ✅ 핵심 포인트
+- 802.1X 유선 인증은 Windows에서 dot3svc가 필요함.
+- 서비스: Wired AutoConfig
+-  시작 유형: 자동
+- 상태: 실행 중
+
+📷 dot3svc 수동/중지 상태
+
+<img width="1019" height="840" alt="스크린샷 2026-01-18 033337" src="https://github.com/user-attachments/assets/8484877a-a5b6-4dfd-90e4-38e8ebf80fe8" />
+
+📷 자동으로 변경
+
+<img width="1030" height="845" alt="스크린샷 2026-01-18 033353" src="https://github.com/user-attachments/assets/cfcdb1e2-7b2f-4697-b2c0-fc30a79bfe6e" />
+
+📷 실행 중 확인
+
+<img width="1018" height="848" alt="스크린샷 2026-01-18 033438" src="https://github.com/user-attachments/assets/15b90b6e-8640-4f9d-8f97-ca7ab7e44ded" />
+
+
+---
+
+## 10) 이더넷 어댑터 802.1X 설정(PEAP)
+   
+### ✅ 핵심 포인트
+- 이더넷 속성 → 인증 탭
+- “IEEE 802.1X 인증 사용” 체크
+- 네트워크 인증 방법: Microsoft: PEAP
+- PEAP 설정에서 신뢰할 루트 인증기관에 내가 만든 CA 선택
+- 내부 인증 방식: EAP-MSCHAP v2
+
+- ⚠️ "가져오기 완료"인데 안 보일 때 → MMC에서 로컬 컴퓨터 저장소 확인 필요
+(현재 사용자 저장소에 들어가면 802.1X에서 신뢰가 안 잡히는 경우가 많다)
+
+📷 인증 탭에서 802.1X 활성화 + PEAP 선택
+
+<img width="1031" height="839" alt="스크린샷 2026-01-18 033552" src="https://github.com/user-attachments/assets/fe3464d6-5adf-42ba-bc8d-f6c6024d112b" />
+
+📷 PEAP 속성(Trusted Root 목록에서 내 CA 확인)
+
+<img width="1047" height="852" alt="스크린샷 2026-01-18 040504" src="https://github.com/user-attachments/assets/e327ed60-e933-4dcc-acc1-6907bfadec81" />
+
+📷 EAP-MSCHAPv2 설정
+
+<img width="442" height="225" alt="스크린샷 2026-01-18 040554" src="https://github.com/user-attachments/assets/33cf5cf6-a5e1-4440-a65b-ddbf17b5d94f" />
+
+📷 802.1X 고급 설정
+
+<img width="832" height="643" alt="스크린샷 2026-01-18 040716" src="https://github.com/user-attachments/assets/c7bdbd2d-522d-4e38-9033-db5c3d79f19d" />
+
+
+---
+
+## 10) 이더넷 어댑터 802.1X 설정(PEAP)
+- IPv4 → 자동으로 IP 주소 받기 / 자동으로 DNS 받기
+
+📷 IPv4 DHCP 설정
+
+<img width="580" height="631" alt="스크린샷 2026-01-18 040812" src="https://github.com/user-attachments/assets/b84a6dfc-7917-4b71-91d4-87d537b682db" />
